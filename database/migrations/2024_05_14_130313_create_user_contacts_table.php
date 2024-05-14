@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('actor_reels', function (Blueprint $table) {
+        Schema::create('user_contacts', function (Blueprint $table) {
             $table->id();
-            $table->string('reel');
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->string('thumbnail');
-            $table->unsignedBigInteger('plays')->default(0);
+            $table->foreignId('user')->constrained('users')->onDelete('cascade');
+            $table->string('contact_email')->nullable();
+            $table->string('contact_phone')->nullable();
+            $table->string('location')->nullable();
             $table->timestamps();
         });
     }
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('actor_reels');
+        Schema::dropIfExists('user_contacts');
     }
 };

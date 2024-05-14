@@ -5,11 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ActorReel extends Model
+class UserContact extends Model
 {
     use HasFactory;
 
-    protected $fillable=['user_id','reel','thumbnail','plays'];
-
-
+    protected $fillable = ['user','contact_email','contact_phone','location'];
 }

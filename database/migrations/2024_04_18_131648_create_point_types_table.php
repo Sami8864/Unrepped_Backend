@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('point_types', function (Blueprint $table) {
             $table->id();
             $table->string('type');
-            $table->unsignedBigInteger('points');
+            $table->unsignedDecimal('points');
             $table->timestamps();
         });
     }

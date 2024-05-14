@@ -35,6 +35,7 @@ return new class extends Migration
             $table->unsignedBigInteger('agree')->nullable();
             $table->string('answer')->nullable();
             $table->string('attribute_name')->nullable();
+            $table->unsignedBigInteger('likes')->default(0);
             $table->timestamps();
         });
     }

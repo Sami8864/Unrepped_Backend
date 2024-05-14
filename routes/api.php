@@ -46,7 +46,7 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 Route::post('/actor/profile/details', [UserDetailController::class, 'getActorProfile']);
 Route::post('/search', [SearchController::class, 'search']);
 Route::get('/unions', [AuthController::class, 'unions']);
-Route::get('/anonymous/user', [UserDetailController::class, 'makeUser']);
+Route::post('/anonymous/user', [UserDetailController::class, 'makeUser']);
 Route::post('/answer', [InitialQuestionnaire::class, 'Answer']);
 Route::post('/similar-Face', [InitialQuestionnaire::class, 'detectFace']);
 Route::post('/attributes', [UserDetailController::class, 'getAttributes']);

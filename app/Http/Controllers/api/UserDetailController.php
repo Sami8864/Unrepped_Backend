@@ -30,6 +30,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use ProtoneMedia\LaravelFFMpeg\Support\FFMpeg;
+
+use Illuminate\Support\Facades\Hash;
 use App\Models\PointType;
 
 
@@ -113,7 +115,7 @@ class UserDetailController extends Controller
                         'profile' => $headshot->device_id
                     ]);
                 } else {
-                    return response()->json(['code' => 400, 'message' => 'Headshoot is missing']);
+                    return response()->json(['code' => 400, 'message' => 'Headshot is missing']);
                 }
             }
         }
@@ -127,6 +129,20 @@ class UserDetailController extends Controller
                     'type_id' =>  $type1->id,
                     'user_id' =>  $profile->id
                 ]);
+                $head_shoot_exist = Headshots::where('device_id', $data['device_id'])->where('type_id', 2)->pluck('id')->first();
+                if (isset($head_shoot_exist)) {
+                    UserAttribute::create([
+                        'headshot' => Headshots::where('device_id', $data['device_id'])->where('type_id', 2)->pluck('id')->first(),
+                        'attribute_type' => 6,
+                        'attribute_name' => Type::where('id', $type1->id)->pluck('name')->first(),
+                        'agree' => 15,
+                        'disagree' => 0,
+                        'answer' => Type::where('id', $Model->id)->pluck('name')->first(),
+                        'profile' => $headshot->device_id
+                    ]);
+                } else {
+                    return response()->json(['code' => 400, 'message' => 'Headshot is missing']);
+                }
             }
         }
         return response()->json(['code' => 200, 'message' => 'Profile created successfully', 'profile' => $profile], 200);
@@ -226,18 +242,44 @@ class UserDetailController extends Controller
             ], 200);
         }
     }
-    public function makeUser()
+    public function makeUser(Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email|unique:App\Models\User,email',
+            'password' => 'required|confirmed|min:6',
+        ]);
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json([
+                'code' => 422,
+                'error' => $validator->errors()->first()
+            ], 422);
+        }
         $newUser = new ProfileProgress;
         $newUser->device_id = $this->generateUniqueToken();
-        $newUser->battery_level = 0;
+        $newUser->types_points = 1;
         $newUser->account_level = 0;
         $newUser->available_contacts = '0';
         $newUser->save();
+        if(isset($request->ref))
+        $referrer = ProfileProgress::where('device_id', $request->ref)->first();
+        $actualUser =  User::create([
+            'name'        => $request->name,
+            'barcode'    => uniqid(),
+            'email'       => $request->email,
+            'referrer_id' => $referrer ?? null,
+            'profileprogess_id'=> $newUser->id,
+            'password'    => Hash::make($request->password),
+            'email_verified_at' => now(),
+            'user_type'=>'User',
+            'status'=>'active'
+        ]);
+
+
         return response()->json([
             'code' => 200,
             'message' => 'Account made',
-            'user' => $newUser
+            'user' => $actualUser
         ], 200);
     }
     public function generateUniqueToken()
@@ -393,6 +435,26 @@ class UserDetailController extends Controller
         }
     }
 
+
+
+    public function getTypes(int $id)
+    {
+        $essences = UserAttribute::where('profile', $id)->where('attribute_type', 6)->get()->toArray();
+        //dd( $essences);
+        //dd($professions[1]->agree);\
+        usort($essences, function ($a, $b) {
+            return $b['agree'] <=> $a['agree'];
+        });
+        // Take the top two professions
+        $essence = array_slice($essences, 0, 1);
+        $final = [
+            'name' => $essence[0]['attribute_name'],
+            'likes' => $essence[0]['agree'] - 15
+        ];
+        return $final;
+    }
+
+
     public function getEssence(int $id)
     {
         $essences = UserAttribute::where('profile', $id)->where('attribute_type', 5)->get()->toArray();
@@ -501,6 +563,7 @@ class UserDetailController extends Controller
         $device['profile_image'] = $this->getPrimaryHeadshot($user);
         $device['professions'] = $this->topProfessions($user);
         $device['essence'] = $this->getEssence($user);
+        $device['types'] = $this-> getTypes($user);
         $device['user_details'] = UserDetail::where('device_id', $user)->first();
         $device['links'] =  $this->getLinks($userId->id);
         //  $details=$device->with('user_details_No')->first();
@@ -719,11 +782,11 @@ class UserDetailController extends Controller
             $filename = FileUpload::handleVideofordigitaloceanstorage($request->file('reel'), 'actor/reels/');
             $data2['device_id'] = User::where('id', auth()->user()->id)->value('profileprogess_id');
             $dev = ProfileProgress::where('id', $data2['device_id'])->first();
-            if ($dev->types_points < 100) {
+            $pointsDel = PointType::where('type', 'Reel')->value('points');
+            if ($dev->types_points < $pointsDel) {
                 return response()->json(['Message' => 'You don,t have sufficient balance to upload reel', 422]);
             }
 
-            $pointsDel = PointType::where('type', 'Reel')->value('points');
             $dev->types_points -= $pointsDel;
             if ($dev->types_points < 50) {
                 $dev->account_level = 1;

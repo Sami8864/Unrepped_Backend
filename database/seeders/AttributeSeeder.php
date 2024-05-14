@@ -28,6 +28,9 @@ class AttributeSeeder extends Seeder
             ], [
 
                 'name' => 'essence'
+            ], [
+
+                'name' => 'type'
             ]
         ]);
     }

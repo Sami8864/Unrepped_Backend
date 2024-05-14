@@ -16,11 +16,11 @@ class PointSeeder extends Seeder
     public function run(): void
     {
         DB::table("point_types")->insert([
-            ['type' => 'Swiper_add','points'=>10],
-            ['type' => 'Swiper_del','points'=>1],
-            ['type' => 'Image','points'=>50],
-            ['type' => 'Reel','points'=>100],
-            ['type' => 'Achievement','points'=>250]
+            ['type' => 'Swiper_add','points'=>0.03],
+            ['type' => 'Swiper_del','points'=>0.01],
+            ['type' => 'Image','points'=>0.3],
+            ['type' => 'Reel','points'=>0.3],
+            ['type' => 'Achievement','points'=>0.25]
         ]);
     }
 }

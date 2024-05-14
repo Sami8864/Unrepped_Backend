@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::create('profile_progress', function (Blueprint $table) {
             $table->id();
-            $table->integer('battery_level');
+            $table->integer('battery_level')->nullable();
             $table->integer('account_level');
-            $table->string('types_points')->default(0);
+            $table->unsignedDecimal('types_points')->default(0);
             $table->string('invites_points')->default(0);
             $table->string('device_id');
             $table->string('available_contacts')->nullable();
