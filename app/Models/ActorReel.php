@@ -9,7 +9,7 @@ class ActorReel extends Model
 {
     use HasFactory;
 
-    protected $fillable=['user_id','reel','thumbnail','plays'];
+    protected $fillable=['user_id','reel','thumbnail','plays','likes'];
 
 
 }

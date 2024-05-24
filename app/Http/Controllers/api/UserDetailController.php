@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use ProtoneMedia\LaravelFFMpeg\Support\FFMpeg;
 
+use App\Services\ResponseService;
 use Illuminate\Support\Facades\Hash;
 use App\Models\PointType;
 
@@ -38,7 +39,12 @@ use App\Models\PointType;
 
 class UserDetailController extends Controller
 {
+    private $responseService;
 
+    public function __construct(ResponseService $responseService)
+    {
+        $this->responseService = $responseService;
+    }
     public function store(Request $request)
     {
 
@@ -261,21 +267,55 @@ class UserDetailController extends Controller
         $newUser->account_level = 0;
         $newUser->available_contacts = '0';
         $newUser->save();
-        if(isset($request->ref))
-        $referrer = ProfileProgress::where('device_id', $request->ref)->first();
+        if (isset($request->ref))
+            $referrer = ProfileProgress::where('device_id', $request->ref)->first();
         $actualUser =  User::create([
             'name'        => $request->name,
             'barcode'    => uniqid(),
             'email'       => $request->email,
             'referrer_id' => $referrer ?? null,
-            'profileprogess_id'=> $newUser->id,
+            'profileprogess_id' => $newUser->id,
             'password'    => Hash::make($request->password),
             'email_verified_at' => now(),
-            'user_type'=>'User',
-            'status'=>'active'
+            'user_type' => 'User',
+            'status' => 'active'
         ]);
+        $credentials = $request->only('email', 'password');
+        if (Auth::attempt($credentials)) {
 
+            UserLink::updateOrCreate(
+                ['user_id' => $actualUser->id],
+                [
+                    'casting_networks' => null,
+                    'instagram' =>  null,
+                    'tiktok' =>  null,
+                ]
+            );
+            if ($request->is('api/*')) {
+                $device_name = ($request->device_name) ? $request->device_name : config("app.name");
+                $token = Auth::user()->createToken($device_name)->plainTextToken;
+                // $this->token( $token);
+                return $this->responseService->jsonResponse(200, 'User logged in successfully', [
+                    'user' => Auth::user(),
+                    'access_token' => $token,
+                    'token_type' => 'Bearer',
 
+                    //'link' =>  $url,
+                    // 'notification' => $notification,
+                ]);
+            } else {
+                $request->session()->regenerate();
+                if ($request->expectsJson()) {
+
+                    //$device_name = ($request->device_name) ? $request->device_name : config("app.name");
+                    //$accessToken = Auth::user()->createToken($device_name)->plainTextToken;
+                    $data = Auth::get();
+
+                    return response()->json($data);
+                }
+                return redirect()->intended('/');
+            }
+        }
         return response()->json([
             'code' => 200,
             'message' => 'Account made',
@@ -307,9 +347,7 @@ class UserDetailController extends Controller
             ->toArray();
 
         // Fetch profiles from profile progress that are not disabled
-        $profiles = ProfileProgress::whereNotIn('id', $disabledProfiles)->where('account_level', 3)
-            ->latest()
-            ->get();
+        $profiles = ProfileProgress::whereNotIn('id', $disabledProfiles)->get();
 
         // Fetch additional data for each profile if needed
         $arr = [];
@@ -446,12 +484,23 @@ class UserDetailController extends Controller
             return $b['agree'] <=> $a['agree'];
         });
         // Take the top two professions
-        $essence = array_slice($essences, 0, 1);
-        $final = [
-            'name' => $essence[0]['attribute_name'],
-            'likes' => $essence[0]['agree'] - 15
-        ];
-        return $final;
+        if (count($essences) == 1) {
+            $topTwoProfessions[0] = [
+                'name' => $essences[0]->answer,
+                'likes' => $essences[0]->agree - 15
+            ];
+        } else {
+            $topTwoProfessions = array_slice($essences, 0, 2);
+            $topTwoProfessions[0] = [
+                'name' => $topTwoProfessions[0]->answer,
+                'likes' => $topTwoProfessions[0]->agree - 15
+            ];
+            $topTwoProfessions[1] = [
+                'name' => $topTwoProfessions[1]->answer,
+                'likes' => $topTwoProfessions[1]->agree - 15
+            ];
+        }
+        return $topTwoProfessions;
     }
 
 
@@ -563,7 +612,7 @@ class UserDetailController extends Controller
         $device['profile_image'] = $this->getPrimaryHeadshot($user);
         $device['professions'] = $this->topProfessions($user);
         $device['essence'] = $this->getEssence($user);
-        $device['types'] = $this-> getTypes($user);
+        $device['types'] = $this->getTypes($user);
         $device['user_details'] = UserDetail::where('device_id', $user)->first();
         $device['links'] =  $this->getLinks($userId->id);
         //  $details=$device->with('user_details_No')->first();
@@ -577,10 +626,7 @@ class UserDetailController extends Controller
     public function getReel()
     {
         $reel = ActorReel::where('user_id', auth()->user()->id)
-            ->latest('updated_at')
-            ->first();
-
-
+        ->get();
         return $reel;
     }
 
@@ -620,6 +666,9 @@ class UserDetailController extends Controller
 
         $device['links'] =  $this->getLinks(request()->user()->id);
         $device['reel'] =  $this->getReel();
+        if(!isset($device['reel'])){
+            $device['reel'] =NULL;
+        }
         //  $details=$device->with('user_details_No')->first();
         // dd( $details);
         return response()->json([
@@ -893,6 +942,7 @@ class UserDetailController extends Controller
             $user['details'] = UserDetail::where('device_id',  $device)->first();
             $user['social_links'] = UserLink::where('user_id', $userid->id)->first();
             $user['media'] = Headshots::where('device_id', $device)->get();
+            $user['reels']=$this->getReel();
             return response()->json([
                 'message' => 'Data Fetched successfully',
                 'code' => 200,
@@ -1026,14 +1076,63 @@ class UserDetailController extends Controller
                     'user_name' => $user->name,
                     'user_email' => $user->email,
                     'spending_type' => $transaction->spending_type,
-                    'transaction_type' => $transaction->transaction_type
+                    'transaction_type' => $transaction->transaction_type,
+                    'created_at'=>$transaction->created_at
                 ];
-
+dd($transactionData);
                 $transactionsWithUserDetails[] = $transactionData;
             }
         }
 
         // Return the array as a JSON response
         return response()->json(['data' => $transactionsWithUserDetails], 200);
+    }
+
+    public function updateProf(Request $request)
+    {
+        $data = $request->all();
+
+        $validator = Validator::make($data, [
+            'device_id' => 'required|exists:profile_progress,id',
+            'name' => 'required|string',
+            'weight_height' => 'required|string',
+            'casting_networks' => 'nullable|url',
+            'instagram' => 'nullable|url',
+            'tiktok' => 'nullable|url',
+            'location' => 'required|string',
+            'email' => 'required',
+            'phone' => 'required'
+        ]);
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json([
+                'code' => 422,
+                'error' => $validator->errors()->first()
+            ], 422);
+        } else {
+            $values = explode(',', $data['weight_height']);
+            // Extract values for meters and pounds
+            $metersValue = (float)str_replace('m', '', trim($values[0])); // Remove 'm' and convert to float
+            $poundsValue = (int)str_replace('lbs', '', trim($values[1])); //
+            $profile = UserDetail::where('device_id', $request->device_id)->first();
+            $profile->name = $request->name;
+            $profile->location = $request->location;
+            $profile->weight = $poundsValue;
+            $profile->height = $metersValue;
+            $user = Auth::user();
+            $user->email = $request->email;
+            $user->phone = $request->phone;
+            UserLink::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'casting_networks' => $request->casting_networks ?? null,
+                    'instagram' => $request->instagram ?? null,
+                    'tiktok' => $request->tiktok ?? null,
+                ]
+            );
+            $profile->save();
+            $user->save();
+            return response()->json(['message' => 'User Updated Successfully'], 200);
+        }
     }
 }

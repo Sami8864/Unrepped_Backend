@@ -11,6 +11,7 @@ use App\Models\ProfileProgress;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Notifications\AchievementNotification;
 use App\Traits\Notification as NotificationTrait;
 use App\Models\Notification as NotificationModel;
@@ -157,7 +158,7 @@ class AchievementCount extends Command
             $achievement_id =  DB::table('user_achievements')->where('profile_progress_id', $user_id)->value('achievement_id');
 
             $achievement =  Achievement::where('id',  $achievement_id)->first();
-           
+
             if (isset($achievement)) {
                 $response =   [
                     'title' => 'You reached ' . $achievement->name,

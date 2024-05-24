@@ -445,5 +445,12 @@ class ConversationController extends Controller
 
         return response()->json(['message' => 'Conversations unmuted successfully', 'code' => 200]);
     }
-
+    public function send11()
+    {
+        $id=User::find(1);
+        $muted=false;
+        $token = Device::where('user_id', 1)->latest()->pluck('device_token')->first();
+        $response = $this->send('oye khotte', 'k bche', ["d7O9Sh13dMsNCTKDCRHlW7:APA91bEQ2f4ZuU9K8CFSUwNFZR9eLsUJh66sTgVcqHXBDTrxlIUrQw-vCopZzZwsN7_ixtrlZvoSpasa3rAb8ORFHfeywyqvaBqNfSyglFNaoc-Jhmok35za6AMLhkc4sfSW6UWN8DCe"], $id->getData(), $muted, 'message');
+       dd($response );
+    }
 }

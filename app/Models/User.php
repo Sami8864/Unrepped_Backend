@@ -23,6 +23,7 @@ class User extends Authenticatable
      * @var array<int, string>
      */
     protected $fillable = [
+        'name',
         'email',
         'password',
         'provider',
@@ -34,7 +35,7 @@ class User extends Authenticatable
         'email_verification_code',
         'email_verification_code_expires',
         'email_verified_at',
-        'status'
+        'status','phone'
     ];
 
     /**

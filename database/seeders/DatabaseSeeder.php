@@ -37,7 +37,7 @@ class DatabaseSeeder extends Seeder
         $this->call(FlagSeeder::class);
         $this->call(AttributeSeeder::class);
         $this->call(UnionSeeder::class);
-        //$this->call(UserSeeder::class);
+        $this->call(UserSeeder::class);
 
         //$this->call(AdminSeeder::class);
         //$this->call(AchievementSeeder::class);

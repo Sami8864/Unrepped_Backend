@@ -24,7 +24,7 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 
 {
-     use Notification;
+    use Notification;
     private $responseService;
 
     public function __construct(ResponseService $responseService)
@@ -43,6 +43,17 @@ class AuthController extends Controller
 
         return $barcodeNumber;
     }
+    public function generateUniqueToken()
+    {
+        $token = Str::random(40); // Adjust the length as needed
+
+        // Ensure the token is unique in your database
+        while (ProfileProgress::where('device_id', $token)->exists()) {
+            $token = Str::random(40);
+        }
+
+        return $token;
+    }
     public function register(Request $request)
     {
         try {
@@ -50,7 +61,6 @@ class AuthController extends Controller
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email|unique:App\Models\User,email',
                 'password' => 'required|confirmed|min:6',
-                'name' => 'required',
             ]);
             // Check if validation fails
             if ($validator->fails()) {
@@ -64,19 +74,25 @@ class AuthController extends Controller
 
                 $referrer = ProfileProgress::where('device_id', $request->ref)->first();
                 $generateReferCode = ProfileProgress::where('id', $request->device_id)->value('device_id');
-                $url = config('app.url') .'invite/'  .  $generateReferCode;
+                $url = config('app.url') . 'invite/'  .  $generateReferCode;
                 if (isset($referrer)) {
+                    $newUser = new ProfileProgress;
+                    $newUser->device_id = $this->generateUniqueToken();
+                    $newUser->types_points = 1;
+                    $newUser->account_level = 0;
+                    $newUser->available_contacts = '0';
+                    $newUser->save();
                     $user =  User::create([
-                        'name'        => $request->name,
                         'barcode'    => $uniqueString,
                         'email'       => $request->email,
                         'referrer_id' => $referrer ? $referrer->id : null,
-                        'profileprogess_id'=> $request->device_id,
+                        'profileprogess_id' => $newUser->id,
                         'password'    => Hash::make($request->password),
                         'email_verified_at' => now(),
-                        'user_type'=>'User',
-                        'status'=>'active'
+                        'user_type' => 'User',
+                        'status' => 'active'
                     ]);
+
                     $referrerProfileProgressId = $referrer->id;
                     // Find the ProfileProgress record based on profileprogess_id
                     $profileProgress = ProfileProgress::where('id', $referrerProfileProgressId)->first();
@@ -93,8 +109,8 @@ class AuthController extends Controller
                     if (Auth::attempt($credentials)) {
                         if ($request->is('api/*')) {
                             $device_name = ($request->device_name) ? $request->device_name : config("app.name");
-                            $token =Auth::user()->createToken($device_name)->plainTextToken;
-                            $this->token( $token);
+                            $token = Auth::user()->createToken($device_name)->plainTextToken;
+                            $this->token($token);
                             return $this->responseService->jsonResponse(200, 'User logged in successfully', [
                                 'user' => Auth::user(),
                                 'access_token' => $token,
@@ -117,17 +133,24 @@ class AuthController extends Controller
                     }
                     return response()->json(["email" => $request->email, "password" => $request->password], 422);
                 } else {
+
+                    $newUser = new ProfileProgress;
+                    $newUser->device_id = $this->generateUniqueToken();
+                    $newUser->types_points = 1;
+                    $newUser->account_level = 0;
+                    $newUser->available_contacts = '0';
+                    $newUser->save();
+
                     $user =  User::create([
-                        'name'        => $request->name,
                         'barcode'    => $uniqueString,
                         'email'       => $request->email,
                         'referrer_id' => null,
-                        'profileprogess_id'=> $request->device_id,
+                        'profileprogess_id' => $newUser->id,
                         'password'    => Hash::make($request->password),
                         'email_verified_at' => now(),
-                        'status'=>'active'
+                        'status' => 'active'
                     ]);
-                    $user->user_type='user';
+                    $user->user_type = 'user';
                     $user->save();
                     $user->assignRole('user');
                     event(new Registered($user));
@@ -135,8 +158,8 @@ class AuthController extends Controller
                     if (Auth::attempt($credentials)) {
                         if ($request->is('api/*')) {
                             $device_name = ($request->device_name) ? $request->device_name : config("app.name");
-                            $token =Auth::user()->createToken($device_name)->plainTextToken;
-                            $this->token( $token);
+                            $token = Auth::user()->createToken($device_name)->plainTextToken;
+                            $this->token($token);
 
                             return $this->responseService->jsonResponse(200, 'User logged in successfully', [
                                 'user' => Auth::user(),
@@ -160,7 +183,7 @@ class AuthController extends Controller
                     }
                     return response()->json(["email" => $request->email, "password" => $request->password], 422);
                 }
-            } else if(($request->user_type == 2) ){
+            } else if (($request->user_type == 2)) {
                 $uniqueString = uniqid();
                 $user = new User();
                 $user->name = $request->name;
@@ -168,8 +191,8 @@ class AuthController extends Controller
                 $user->email = $request->email;
                 $user->email_verified_at = now();
                 $user->barcode =  $uniqueString;
-                $user->status='active';
-                $user->user_type='Filmmaker';
+                $user->status = 'active';
+                $user->user_type = 'Filmmaker';
                 $user->save();
                 $user->assignRole('filmmaker');
                 event(new Registered($user));
@@ -178,8 +201,8 @@ class AuthController extends Controller
                     if ($request->is('api/*')) {
 
                         $device_name = ($request->device_name) ? $request->device_name : config("app.name");
-                        $token =Auth::user()->createToken($device_name)->plainTextToken;
-                        $this->token( $token);
+                        $token = Auth::user()->createToken($device_name)->plainTextToken;
+                        $this->token($token);
                         return response()->json([
                             'code' => 200,
                             'message' => 'User logged in successfully',
@@ -204,8 +227,7 @@ class AuthController extends Controller
                     }
                 }
                 return response()->json(["email" => $request->email, "password" => $request->password], 422);
-            }
-            elseif(($request->user_type == 3)){
+            } elseif (($request->user_type == 3)) {
 
                 $uniqueString = uniqid();
                 $user = new User();
@@ -213,9 +235,9 @@ class AuthController extends Controller
                 $user->password = Hash::make($request->password);
                 $user->email = $request->email;
                 $user->email_verified_at = now();
-                $user->user_type='Admin';
+                $user->user_type = 'Admin';
 
-                $user->status='active';
+                $user->status = 'active';
                 $user->save();
                 $user->assignRole('admin');
                 event(new Registered($user));
@@ -224,8 +246,8 @@ class AuthController extends Controller
                     if ($request->is('api/*')) {
 
                         $device_name = ($request->device_name) ? $request->device_name : config("app.name");
-                        $token =Auth::user()->createToken($device_name)->plainTextToken;
-                        $this->token( $token);
+                        $token = Auth::user()->createToken($device_name)->plainTextToken;
+                        $this->token($token);
                         return response()->json([
                             'code' => 200,
                             'message' => 'User logged in successfully',
@@ -235,7 +257,9 @@ class AuthController extends Controller
                                 'token_type' => 'Bearer',
                                 // 'notification' =>  $notification,
                             ],
-                        ]);}}
+                        ]);
+                    }
+                }
             }
         } catch (\Throwable $th) {
             return response()->json(['error' => $th->getMessage()]);
@@ -356,7 +380,7 @@ class AuthController extends Controller
 
             return response()->json(['code' => 200, 'message' => 'Password changed successfully'], 200);
         } catch (\Throwable $th) {
-            return response()->json(['code' => 401, 'error' => $th->getMessage()],422);
+            return response()->json(['code' => 401, 'error' => $th->getMessage()], 422);
         }
     }
     public function login(Request $request)
@@ -378,7 +402,7 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, $remember_me)) {
             if ($request->is('api/*')) {
                 $device_name = ($request->device_name) ? $request->device_name : config("app.name");
-                if(Auth::user()->status=='disabled'){
+                if (Auth::user()->status == 'disabled') {
                     return response()->json(['code' => 403, 'error' => 'Account disabled'], 200);
                 }
                 return response()->json([
@@ -402,9 +426,9 @@ class AuthController extends Controller
             $user = Auth::user();
             $user = ProfileProgress::find($user->profileprogess_id);
             if ($user) {
-                $user->status='disabled';
+                $user->status = 'disabled';
                 $user->save();
-                return $this->responseService->jsonResponse(200, 'User Deleted successfully', ['is_deleted'=>$data]);
+                return $this->responseService->jsonResponse(200, 'User Deleted successfully', ['is_deleted' => $data]);
             } else {
                 return $this->responseService->jsonResponse(401, 'User not  found', []);
             }
@@ -444,14 +468,14 @@ class AuthController extends Controller
     public function DeleteUserAccount(Request $request)
     {
         try {
-            $user=User::where('id',$request->id)->first();
-            if(!isset($user))
-            return $this->responseService->jsonResponse(401, 'User not  found', []);
-        else{
-            $user->status="disabled";
-            $user->save();
-            return $this->responseService->jsonResponse(200, 'User is disabled successfully', []);
-        }
+            $user = User::where('id', $request->id)->first();
+            if (!isset($user))
+                return $this->responseService->jsonResponse(401, 'User not  found', []);
+            else {
+                $user->status = "disabled";
+                $user->save();
+                return $this->responseService->jsonResponse(200, 'User is disabled successfully', []);
+            }
         } catch (\Throwable $th) {
             return response()->json(['error' => $th->getMessage()]);
         }
@@ -470,7 +494,7 @@ class AuthController extends Controller
                 ];
             }
 
-            return response()->json(['data'=>$array , 'message'=> 'data fetched successfully', 'code'=> 200 ]);
+            return response()->json(['data' => $array, 'message' => 'data fetched successfully', 'code' => 200]);
         } catch (Throwable $th) {
             return response()->json(['error' => $th->getMessage()]);
         }
@@ -479,15 +503,15 @@ class AuthController extends Controller
     {
         try {
             $user = Auth::user();
-             // dd( $request->all() );
-             $validator = Validator::make($request->all(), [
+            // dd( $request->all() );
+            $validator = Validator::make($request->all(), [
                 'profileImage' => 'required',
             ]);
             // Check if validation fails
             if ($validator->fails()) {
                 return response()->json(['code' => '422', 'errors' => $validator->errors()->first()], 422);
             }
-            $filename = (time()+ random_int(100, 1000));
+            $filename = (time() + random_int(100, 1000));
             $extension = $request->file('profileImage')->getClientOriginalExtension();
             $filename = $filename . '.' . $extension;
             $filePath = '/profile/images' . $filename;
@@ -497,7 +521,7 @@ class AuthController extends Controller
                 ['user_id' => $user->id], // Search condition
                 ['profile_image' => $path] // Data to update or create
             );
-            return response()->json(['data'=>$data , 'message'=> 'Profile Has been updated Successfully', 'code'=> 200 ]);
+            return response()->json(['data' => $data, 'message' => 'Profile Has been updated Successfully', 'code' => 200]);
         } catch (\Throwable $th) {
             return response()->json(['error' => $th->getMessage()]);
         }
@@ -506,14 +530,14 @@ class AuthController extends Controller
     {
         try {
             $user = Auth::user();
-             // dd( $request->all() );
-             $validator = Validator::make($request->all(), [
+            // dd( $request->all() );
+            $validator = Validator::make($request->all(), [
                 'coverImage' => 'required',
             ]);
             if ($validator->fails()) {
                 return response()->json(['code' => '422', 'errors' => $validator->errors()->first()], 422);
             }
-            $filename = (time()+ random_int(100, 1000));
+            $filename = (time() + random_int(100, 1000));
             $extension = $request->file('coverImage')->getClientOriginalExtension();
             $filename = $filename . '.' . $extension;
             $filePath = '/cover/images' . $filename;
@@ -523,7 +547,7 @@ class AuthController extends Controller
                 ['user_id' => $user->id], // Search condition
                 ['cover_image' => $path] // Data to update or create
             );
-            return response()->json(['data'=>$data , 'message'=> 'Profile Has been updated Successfully', 'code'=> 200 ]);
+            return response()->json(['data' => $data, 'message' => 'Profile Has been updated Successfully', 'code' => 200]);
         } catch (\Throwable $th) {
             return response()->json(['error' => $th->getMessage()]);
         }
@@ -532,10 +556,10 @@ class AuthController extends Controller
     {
         try {
             $user = Auth::user();
-            $data = FilmMaker::where('user_id',$user->id)->update([
+            $data = FilmMaker::where('user_id', $user->id)->update([
                 'cover_image' => null
             ]);
-            return response()->json(['data'=>$data , 'message'=> 'Profile Has been updated Successfully', 'code'=> 200 ]);
+            return response()->json(['data' => $data, 'message' => 'Profile Has been updated Successfully', 'code' => 200]);
         } catch (\Throwable $th) {
             return response()->json(['error' => $th->getMessage()]);
         }
@@ -544,10 +568,10 @@ class AuthController extends Controller
     {
         try {
             $user = Auth::user();
-            $data = FilmMaker::where('user_id',$user->id)->update([
+            $data = FilmMaker::where('user_id', $user->id)->update([
                 'profile_image' => null
             ]);
-            return response()->json(['data'=>$data , 'message'=> 'Profile Has been updated Successfully', 'code'=> 200 ]);
+            return response()->json(['data' => $data, 'message' => 'Profile Has been updated Successfully', 'code' => 200]);
         } catch (\Throwable $th) {
             return response()->json(['error' => $th->getMessage()]);
         }
@@ -572,19 +596,17 @@ class AuthController extends Controller
             if ($usernameField === 'email') {
                 $user = User::findByEmail($data['email']);
 
-                if (! $user) {
-                    return response()->json(['message'=>'Please enter a valid email','code'=> 400],400);
+                if (!$user) {
+                    return response()->json(['message' => 'Please enter a valid email', 'code' => 400], 400);
                 }
 
                 VerificationService::sendEmailVerificationCode($user);
-            }else {
-                return response()->json(['message'=>'Please enter a valid email']);
+            } else {
+                return response()->json(['message' => 'Please enter a valid email']);
             }
-            return response()->json(['messae' =>"Verification code sent to your $usernameField." ]);
-
+            return response()->json(['messae' => "Verification code sent to your $usernameField."]);
         } catch (Throwable $th) {
-            return response()->json(['error'=>$th->getMessage()],400);
-
+            return response()->json(['error' => $th->getMessage()], 400);
         }
     }
     public function verifyEmail(Request $request)
@@ -603,7 +625,7 @@ class AuthController extends Controller
             }
             return VerificationService::verifyEmail($request->email, $request->code);
         } catch (Throwable $th) {
-            return response()->json(['error'=>$th->getMessage(), 'code'=> 400]);
+            return response()->json(['error' => $th->getMessage(), 'code' => 400]);
         }
     }
     protected function updatePassword($user, $password)
@@ -632,7 +654,7 @@ class AuthController extends Controller
             if ($usernameField === 'email') {
                 $user = User::findByEmail($request->email);
                 if (!$user) {
-                    return response()->json(['message'=>'No record found.','code'=> 400],400);
+                    return response()->json(['message' => 'No record found.', 'code' => 400], 400);
                 }
                 $verfied =   VerificationService::verifyEmail($request->email, $request->code);
 
@@ -640,15 +662,13 @@ class AuthController extends Controller
                 if ($verfied) {
                     $this->updatePassword($user, $request->password);
                 } else {
-                    return response()->json(['message'=>'Verification code is either incorrect or expired.','code'=> 400],400);
+                    return response()->json(['message' => 'Verification code is either incorrect or expired.', 'code' => 400], 400);
                 }
-
             }
 
-            return response()->json(['message'=>'Password updated successfully.','code'=> 200],200);
-
+            return response()->json(['message' => 'Password updated successfully.', 'code' => 200], 200);
         } catch (Throwable $th) {
-            return response()->json(['error'=>$th->getMessage(), 'code'=> 400]);
+            return response()->json(['error' => $th->getMessage(), 'code' => 400]);
         }
     }
 }

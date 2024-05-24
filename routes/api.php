@@ -59,7 +59,6 @@ Route::get('/user-feed', [HeadshotsController::class, 'showFeed']);
 Route::post('/share-feed', [HeadshotsController::class, 'shareFeed']);
 Route::get('/get-users', [UserDetailController::class, 'load']);
 Route::get('/get-essence', [UserDetailController::class, 'essence']);
-Route::post('/headshot-data', [UserDetailController::class, 'detailThroughHeadshot']);
 Route::get('/get-type', [UserDetailController::class, 'type']);
 Route::get('/get-physique', [UserDetailController::class, 'physique']);
 Route::get('/generate-barcode', [UserDetailController::class, 'generateBarcodeId']);
@@ -79,6 +78,7 @@ Route::post('/battery-level', [ProfileProgressController::class, 'getBatteryLeve
 Route::post('/register', [AuthController::class, 'register'])->name('register');
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/getAchievements',[AchievementController::class,'load']);
+Route::get('/location', [HeadshotsController::class, 'location']);
 
 
 // Route::post('/add-advertisement', [AdvertisementController::class, 'upload']);
@@ -89,9 +89,17 @@ Route::get('/getAchievements',[AchievementController::class,'load']);
 Route::middleware('auth:sanctum')->post('/change-password', [AuthController::class, 'changePassword']);
 
 Route::group(['middleware' => 'auth:sanctum'], function () {
+    Route::post('/sendit', [ConversationController::class, 'send11']);
+
     Route::post('/actor/search-name', [SearchController::class, 'searchByName']);
     Route::post('/actor/saved/search-name', [SearchController::class, 'searchBySavedName']);
     // Chat moudule  Api's
+    Route::post('/like-headshot', [HeadshotsController::class, 'likeHeadshot']);
+    Route::post('/like-reel', [HeadshotsController::class, 'likeReel']);
+
+    Route::post('/headshot-data', [UserDetailController::class, 'detailThroughHeadshot']);
+
+
     Route::post('getChannelId', [ConversationController::class, 'getChannelId']);
     Route::get('/conversations', [ConversationController::class, 'index']);
     Route::post('/send/message/{id}', [ConversationController::class, 'sendMessageByChannelId']);
@@ -126,6 +134,8 @@ Route::group(['middleware' => 'auth:sanctum'], function () {
     Route::get('/get-all-profiles', [UserDetailController::class, 'getAllProfile']);
     Route::get('/earnings', [UserDetailController::class, 'userEarnings']);
     Route::post('/add-flag', [UserDetailController::class, 'AddFlag']);
+    Route::post('/v2/update', [UserDetailController::class, 'updateProf']);
+
 });
 Route::group(['middleware' => 'auth:sanctum', 'prefix' => 'achievements'], function () {
     Route::apiResource('/', AchievementController::class);

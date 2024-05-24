@@ -69,6 +69,7 @@ class PointsController extends Controller
         $validator = validator::make($data, [
             'type' => 'required|exists:point_types,type',
             'points' => 'required',
+            'action'=>'required'
         ]);
         if ($validator->fails()) {
             return response()->json([

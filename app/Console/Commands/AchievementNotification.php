@@ -35,7 +35,6 @@ class AchievementNotification extends Command
                 ->whereDate('created_at', today()) // Filter achievements for the current day
                 ->get();
 
-             dd( $achievements );
             if ($achievements->isNotEmpty()) {
                 // Send notification to the user
                 $achievementDetails = Achievement::whereIn('id', $achievements->pluck('achievement_id'))->get();
